@@ -24,22 +24,55 @@ HEADERS = {
     "sec-fetch-site": "same-site",
 }
 
-train_station_code_swansea = "4222"
-train_station_code_paddington = "3087"
+# Default values
+DEFAULT_FROM_STATION_CODE = "4222"
+DEFAULT_TO_STATION_CODE = "3087"
 
-from_swansea_threshold = 4000
-from_paddington_threshold = 6500
+DEFAULT_OUTBOUND_DAY_OF_THE_WEEK = "Monday"
+DEFAULT_OUTBOUND_TIME = "18:00"
+DEFAULT_OUTBOUND_FARE_THRESHOLD = 4000
 
-def get_target_dates(months_ahead: int = 3) -> Generator[datetime, None, None]:
-    """Generate Monday and Thursday dates for the next N months."""
-    today = datetime.now().replace(hour=18, minute=0, second=0, microsecond=0)
+DEFAULT_RETURN_DAY_OF_THE_WEEK = "Thursday"
+DEFAULT_RETURN_TIME = "18:00"
+DEFAULT_RETURN_FARE_THRESHOLD = 6500
+
+# Day name to weekday number mapping
+DAY_NAME_TO_WEEKDAY = {
+    "Monday": 0,
+    "Tuesday": 1,
+    "Wednesday": 2,
+    "Thursday": 3,
+    "Friday": 4,
+    "Saturday": 5,
+    "Sunday": 6,
+}
+
+def get_target_dates(
+    outbound_day_of_the_week: str = DEFAULT_OUTBOUND_DAY_OF_THE_WEEK,
+    outbound_time: str = DEFAULT_OUTBOUND_TIME,
+    return_day_of_the_week: str = DEFAULT_RETURN_DAY_OF_THE_WEEK,
+    return_time: str = DEFAULT_RETURN_TIME,
+    months_ahead: int = 3
+) -> Generator[tuple[datetime, str], None, None]:
+    """Generate target dates for outbound and return journeys for the next N months.
+    
+    Yields tuples of (datetime, journey_type) where journey_type is 'outbound' or 'return'.
+    """
+    outbound_weekday = DAY_NAME_TO_WEEKDAY.get(outbound_day_of_the_week, 0)
+    return_weekday = DAY_NAME_TO_WEEKDAY.get(return_day_of_the_week, 3)
+    
+    outbound_hour, outbound_minute = map(int, outbound_time.split(":"))
+    return_hour, return_minute = map(int, return_time.split(":"))
+    
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     end_date = today + timedelta(days=months_ahead * 30)
     
     current = today
     while current <= end_date:
-        # Monday = 0, Thursday = 3
-        if current.weekday() in (0, 3):
-            yield current
+        if current.weekday() == outbound_weekday:
+            yield current.replace(hour=outbound_hour, minute=outbound_minute), "outbound"
+        elif current.weekday() == return_weekday:
+            yield current.replace(hour=return_hour, minute=return_minute), "return"
         current += timedelta(days=1)
 
 
@@ -61,17 +94,14 @@ def create_session() -> requests.Session:
     return session
 
 
-def fetch_journeys(session: requests.Session, departure_datetime: datetime) -> dict | None:
+def fetch_journeys(
+    session: requests.Session,
+    departure_datetime: datetime,
+    from_station_code: str,
+    to_station_code: str
+) -> dict | None:
     """Make a POST request to the GWR API for journey information."""
     url = "https://api.gwr.com/rail/journeys"
-
-    from_station_code = train_station_code_paddington
-    to_station_code = train_station_code_swansea
-
-    # Monday
-    if departure_datetime.weekday() == 0:
-        from_station_code = train_station_code_swansea
-        to_station_code = train_station_code_paddington
 
     payload = {
         "Data": {
@@ -154,13 +184,10 @@ def format_price(pence: int | None, threshold: int | None = None) -> str:
     return price_str
 
 
-def format_for_telegram(date: datetime, trains: list[dict]) -> str:
+def format_for_telegram(date: datetime, trains: list[dict], fare_threshold: int) -> str:
     """Format train information for a Telegram message."""
     day_name = date.strftime("%A")
     date_str = date.strftime("%d %b %Y")
-    
-    # Monday = from Swansea, Thursday = from Paddington
-    threshold = from_swansea_threshold if date.weekday() == 0 else from_paddington_threshold
     
     lines = [f"🚂 *{day_name} {date_str}*"]
     
@@ -169,27 +196,53 @@ def format_for_telegram(date: datetime, trains: list[dict]) -> str:
     else:
         for i, train in enumerate(trains, 1):
             dep_time = train["departure"].strftime("%H:%M")
-            price = format_price(train["ticket_cost"], threshold)
+            price = format_price(train["ticket_cost"], fare_threshold)
             lines.append(f"  {i}. {dep_time} — {price}")
     
     return "\n".join(lines)
 
 
-def main():
+def main(
+    from_station_code: str = DEFAULT_FROM_STATION_CODE,
+    to_station_code: str = DEFAULT_TO_STATION_CODE,
+    outbound_fare_threshold: int = DEFAULT_OUTBOUND_FARE_THRESHOLD,
+    return_fare_threshold: int = DEFAULT_RETURN_FARE_THRESHOLD,
+    outbound_day_of_the_week: str = DEFAULT_OUTBOUND_DAY_OF_THE_WEEK,
+    return_day_of_the_week: str = DEFAULT_RETURN_DAY_OF_THE_WEEK,
+    outbound_time: str = DEFAULT_OUTBOUND_TIME,
+    return_time: str = DEFAULT_RETURN_TIME,
+    months_ahead: int = 3,
+):
     """Main function to fetch and display train fares."""
     all_messages = []
     
     print("Initializing session...")
     session = create_session()
     
-    for target_date in get_target_dates(months_ahead=3):
-        print(f"Fetching journeys for {target_date.strftime('%Y-%m-%d %H:%M')}...")
+    for target_date, journey_type in get_target_dates(
+        outbound_day_of_the_week=outbound_day_of_the_week,
+        outbound_time=outbound_time,
+        return_day_of_the_week=return_day_of_the_week,
+        return_time=return_time,
+        months_ahead=months_ahead
+    ):
+        print(f"Fetching {journey_type} journeys for {target_date.strftime('%Y-%m-%d %H:%M')}...")
         
-        response = fetch_journeys(session, target_date)
+        # Determine station codes and threshold based on journey type
+        if journey_type == "outbound":
+            current_from = from_station_code
+            current_to = to_station_code
+            threshold = outbound_fare_threshold
+        else:  # return
+            current_from = to_station_code
+            current_to = from_station_code
+            threshold = return_fare_threshold
+        
+        response = fetch_journeys(session, target_date, current_from, current_to)
         
         if response:
             trains = extract_trains(response, after_time=target_date, limit=3)
-            message = format_for_telegram(target_date, trains)
+            message = format_for_telegram(target_date, trains, threshold)
             all_messages.append(message)
         else:
             day_name = target_date.strftime("%A")

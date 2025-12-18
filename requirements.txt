@@ -1,3 +1,4 @@
 requests==2.32.5
 python-telegram-bot[job-queue]==22.2
 dotenv==0.9.9
+RapidFuzz==3.14.3
