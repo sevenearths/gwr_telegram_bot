@@ -1,0 +1,28 @@
+{
+  "Data":{
+    "locfrom":"3087",
+    "locto":"4222",
+    "datetimedepart":"2026-01-08T18:00:00",
+    "outwarddepartafter":true,
+    "openreturn":false,
+    "datetimereturn":null,
+    "returndepartafter":true,
+    "directServicesOnly":false,
+    "firstclass":true,
+    "standardclass":true,
+    "promotion":null,
+    "passengergroup":{
+      "passengergroups":[
+        {
+          "adults":1,
+          "children":0,
+          "numberofrailcards":0,
+          "originalfareid":"0",
+          "railcardcode":""
+        }
+      ]
+    },
+    "via":null,
+    "avoid":null
+  }
+}
