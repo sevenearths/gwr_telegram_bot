@@ -3,9 +3,11 @@
 Train Fares Script - Fetches GWR train prices for Monday and Thursday evenings
 """
 
+import json
 import requests
 from datetime import datetime, timedelta
 from typing import Generator
+from urllib.parse import quote_plus
 
 
 # Browser-like headers to mimic website requests
@@ -46,6 +48,67 @@ DAY_NAME_TO_WEEKDAY = {
     "Saturday": 5,
     "Sunday": 6,
 }
+
+# Cache for locations data
+_LOCATIONS_CACHE = None
+_STATION_CODES_CACHE = None
+
+
+def load_locations() -> dict:
+    """Load and cache the locations.json file."""
+    global _LOCATIONS_CACHE, _STATION_CODES_CACHE
+    if _LOCATIONS_CACHE is None:
+        try:
+            with open("locations.json", "r") as f:
+                data = json.load(f)
+                # Create lookup dicts: nlc code -> station name and nlc code -> station code
+                _LOCATIONS_CACHE = {}
+                _STATION_CODES_CACHE = {}
+                for location in data.get("locations", []):
+                    nlc = location.get("nlc")
+                    name = location.get("name")
+                    code = location.get("code")
+                    if nlc and name:
+                        _LOCATIONS_CACHE[nlc] = name
+                    if nlc and code:
+                        _STATION_CODES_CACHE[nlc] = code
+        except FileNotFoundError:
+            print("Warning: locations.json not found, deep links will use station codes")
+            _LOCATIONS_CACHE = {}
+            _STATION_CODES_CACHE = {}
+    return _LOCATIONS_CACHE
+
+
+def get_station_name(nlc_code: str) -> str:
+    """Get station name from NLC code, falling back to the code if not found."""
+    locations = load_locations()
+    return locations.get(nlc_code, nlc_code)
+
+
+def get_station_code(nlc_code: str) -> str:
+    """Get station code (abbreviation) from NLC code, falling back to the NLC if not found."""
+    load_locations()  # Ensure caches are populated
+    return _STATION_CODES_CACHE.get(nlc_code, nlc_code)
+
+
+def create_trainline_deeplink(
+    from_station_code: str,
+    to_station_code: str,
+    departure_datetime: datetime
+) -> str:
+    """Create a Trainline deep link for booking."""
+    origin_name = get_station_name(from_station_code)
+    destination_name = get_station_name(to_station_code)
+    
+    # Format date as YYYY-MM-DDThh:mm
+    date_str = departure_datetime.strftime("%Y-%m-%dT%H:%M")
+    
+    # Build URL with proper encoding
+    base_url = "https://www.thetrainline.com/book/results"
+    params = f"origin={quote_plus(origin_name)}&destination={quote_plus(destination_name)}&outwardDate={date_str}"
+    
+    return f"{base_url}?{params}"
+
 
 def get_target_dates(
     outbound_day_of_the_week: str = DEFAULT_OUTBOUND_DAY_OF_THE_WEEK,
@@ -195,7 +258,9 @@ def format_for_telegram(
     """Format train information for a Telegram message."""
     day_name = date.strftime("%A")
     date_str = date.strftime("%d %b")
-    abbrev = f"{from_station_code.title()} > {to_station_code.title()}"
+    from_abbrev = get_station_code(from_station_code)
+    to_abbrev = get_station_code(to_station_code)
+    abbrev = f"{from_abbrev} > {to_abbrev}"
     
     
     lines = [f"🚂 *{day_name} {date_str}* ({abbrev})"]
@@ -207,6 +272,10 @@ def format_for_telegram(
             dep_time = train["departure"].strftime("%H:%M")
             price = format_price(train["ticket_cost"], fare_threshold)
             lines.append(f"  {i}. {dep_time} — {price}")
+    
+    # Add deep link for booking
+    deep_link = create_trainline_deeplink(from_station_code, to_station_code, date)
+    lines.append(f"  [Book now]({deep_link})")
     
     return "\n".join(lines)
 
