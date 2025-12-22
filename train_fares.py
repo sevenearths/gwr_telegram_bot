@@ -184,12 +184,21 @@ def format_price(pence: int | None, threshold: int | None = None) -> str:
     return price_str
 
 
-def format_for_telegram(date: datetime, trains: list[dict], fare_threshold: int) -> str:
+def format_for_telegram(
+        date: datetime,
+        trains: list[dict],
+        fare_threshold: int,
+        from_station_code: str,
+        to_station_code: str,
+        journey_type: str
+    ) -> str:
     """Format train information for a Telegram message."""
     day_name = date.strftime("%A")
-    date_str = date.strftime("%d %b %Y")
+    date_str = date.strftime("%d %b")
+    abbrev = f"{from_station_code.title()} > {to_station_code.title()}"
     
-    lines = [f"🚂 *{day_name} {date_str}*"]
+    
+    lines = [f"🚂 *{day_name} {date_str}* ({abbrev})"]
     
     if not trains:
         lines.append("  No trains found")
@@ -242,7 +251,14 @@ def main(
         
         if response:
             trains = extract_trains(response, after_time=target_date, limit=3)
-            message = format_for_telegram(target_date, trains, threshold)
+            message = format_for_telegram(
+                target_date,
+                trains,
+                threshold,
+                current_from,
+                current_to,
+                journey_type
+            )
             all_messages.append(message)
         else:
             day_name = target_date.strftime("%A")
