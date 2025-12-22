@@ -57,13 +57,6 @@
             width: 100%;
         }
 
-        @media (max-width: 968px) {
-            .hero-grid {
-                grid-template-columns: 1fr;
-                gap: 60px;
-            }
-        }
-
         .hero-content {
             opacity: 0;
             animation: fadeIn 0.8s ease-out 0.2s forwards;
@@ -144,6 +137,42 @@
             content: attr(data-icon);
             font-size: 1.5rem;
             flex-shrink: 0;
+        }
+
+        /* Mobile Styles */
+        @media (max-width: 968px) {
+            .hero {
+                padding: 60px 32px;
+                min-height: auto;
+            }
+
+            .hero-grid {
+                grid-template-columns: 1fr;
+                gap: 60px;
+            }
+
+            .train-icon {
+                font-size: 2.5rem;
+                margin-bottom: 24px;
+            }
+
+            .tagline {
+                font-size: 1.05rem;
+                margin-bottom: 32px;
+            }
+
+            .hero-features li {
+                font-size: 0.9rem;
+                gap: 10px;
+            }
+
+            .phone-mockup {
+                width: 280px;
+            }
+
+            footer {
+                padding: 40px 32px;
+            }
         }
 
         /* Phone Mockup */
