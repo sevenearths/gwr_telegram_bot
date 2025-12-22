@@ -259,12 +259,12 @@ def format_for_telegram(
     """Format train information for a Telegram message."""
     day_name = date.strftime("%A")
     date_str = date.strftime("%d %b")
-    # from_abbrev = get_station_code(from_station_code)
-    # to_abbrev = get_station_code(to_station_code)
-    # abbrev = f"{from_abbrev} > {to_abbrev}"
+    from_abbrev = get_station_code(from_station_code)
+    to_abbrev = get_station_code(to_station_code)
+    abbrev = f"{from_abbrev} > {to_abbrev}"
     
     
-    lines = [f"🚂 *{day_name} {date_str}*"]
+    lines = [f"🚂 *{day_name} {date_str}* ({abbrev})"]
     
     if not trains:
         lines.append("  No trains found")
@@ -275,8 +275,8 @@ def format_for_telegram(
             lines.append(f"  {i}. {dep_time} — {price}")
     
     # Add deep link for booking
-    deep_link = create_trainline_deeplink(from_station_code, to_station_code, date)
-    lines.append(f"  [Book now]({deep_link})")
+    # deep_link = create_trainline_deeplink(from_station_code, to_station_code, date)
+    # lines.append(f"  [Book now]({deep_link})")
     
     return "\n".join(lines)
 
