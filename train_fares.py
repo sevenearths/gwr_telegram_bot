@@ -91,6 +91,7 @@ def get_station_code(nlc_code: str) -> str:
     return _STATION_CODES_CACHE.get(nlc_code, nlc_code)
 
 
+# Doesn't work - Thanks thetrainline.com. Nice 1!
 def create_trainline_deeplink(
     from_station_code: str,
     to_station_code: str,
@@ -258,12 +259,12 @@ def format_for_telegram(
     """Format train information for a Telegram message."""
     day_name = date.strftime("%A")
     date_str = date.strftime("%d %b")
-    from_abbrev = get_station_code(from_station_code)
-    to_abbrev = get_station_code(to_station_code)
-    abbrev = f"{from_abbrev} > {to_abbrev}"
+    # from_abbrev = get_station_code(from_station_code)
+    # to_abbrev = get_station_code(to_station_code)
+    # abbrev = f"{from_abbrev} > {to_abbrev}"
     
     
-    lines = [f"🚂 *{day_name} {date_str}* ({abbrev})"]
+    lines = [f"🚂 *{day_name} {date_str}*"]
     
     if not trains:
         lines.append("  No trains found")
